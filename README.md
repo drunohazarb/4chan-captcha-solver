@@ -7,6 +7,10 @@ No error handling in place - if solving fails, you can find the reason in js con
 
 I can't upload it to any userscript js site because of size. Most of the size is model weights.
 
+#### 25.08.2023
+
+- New model trained by [Yukariin](https://github.com/Yukariin).
+
 #### 02.11.2022 - brunohazard's version
 
 - New slider solver code ~~stolen~~ taken from the [4chan Mass Reply](https://github.com/HamletDuFromage/4chan-mass-reply) browser extension, which offers a much higher success rate compared to the old code.
