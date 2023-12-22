@@ -7,6 +7,10 @@ No error handling in place - if solving fails, you can find the reason in js con
 
 I can't upload it to any userscript js site because of size. Most of the size is model weights.
 
+#### 22.12.2023
+
+- New model trained by [moffatman](https://github.com/moffatman).
+
 #### 25.08.2023
 
 - New model trained by [Yukariin](https://github.com/Yukariin).
