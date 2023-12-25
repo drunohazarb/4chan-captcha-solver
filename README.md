@@ -7,6 +7,12 @@ No error handling in place - if solving fails, you can find the reason in js con
 
 I can't upload it to any userscript js site because of size. Most of the size is model weights.
 
+#### 25.12.2023
+
+- Yet another more accurate model trained by [Yukariin](https://github.com/Yukariin).
+- Added an alternative script using Tensorflow.js' WebAssembly backend which may replace the main script in the future. On all of my devices it solves the captcha about 150% faster compared to the CPU backend.
+- And if you're reading this on the 25th of December: I wish you a Merry Christmas!
+
 #### 22.12.2023
 
 - New model trained by [moffatman](https://github.com/moffatman).
