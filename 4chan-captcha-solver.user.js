@@ -6,7 +6,7 @@
 // @match       https://sys.4chan.org/*
 // @match       https://sys.4channel.org/*
 // @grant       none
-// @version     1.4.1
+// @version     1.4.2
 // @author      brunohazard
 // @require     https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.js
 // @description 7/8/2021, 1:16:32 PM
@@ -417,7 +417,7 @@
       solve(false);
     });
 
-    window.addEventListener("DOMContentLoaded", function() {
+    window.addEventListener("load", function() { // uBlock Origin on chrome seems to prevent the DOMContentLoaded event from firing...
       observer.observe(document.body, { attributes: true, childList: true, subtree: true });
   
       if(navigator.userAgent.toLowerCase().indexOf('firefox') !== -1){ // request canvas permission on firefox
