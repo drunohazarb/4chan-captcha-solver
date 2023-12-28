@@ -6,12 +6,12 @@
 // @match       https://sys.4chan.org/*
 // @match       https://sys.4channel.org/*
 // @grant       none
-// @version     1.4.2
+// @version     1.4.3
 // @author      brunohazard
 // @require     https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.js
 // @require     https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.10.0/dist/tf-backend-wasm.js
 // @description 7/8/2021, 1:16:32 PM
-// @run-at      document-start
+// @run-at      document-end
 // ==/UserScript==
 // ========================================================= //
 /*                      ACKNOWLEDGEMENTS                     */
@@ -301,7 +301,7 @@
     if(! model){
       model = await load()
     }
-    image = await imageFromCanvas(img, bg, off);
+    image = await imageFromCanvas(img, bg, off)
     const mono = toMonochromeFloat(image.data);
     const filtered2 = tf.tensor3d(mono, [image.height, image.width, 1]);
     tensor = tf.browser.fromPixels(image, 1).mul(-1/238).add(1)
@@ -374,16 +374,16 @@
 
   var previousText = null;
   async function solve(force){
-    const resp = document.getElementById('t-resp');
+    var resp = document.getElementById('t-resp');
     if(! resp) return;
 
-    const bg=document.getElementById('t-bg');
+    var bg=document.getElementById('t-bg');
     if(! bg) return;
 
-    const fg=document.getElementById('t-fg');
+    var fg=document.getElementById('t-fg');
     if(! fg) return;
 
-    const help=document.getElementById('t-help');
+    var help=document.getElementById('t-help');
     if(! help) return;
 
     placeAfter(solveButton, resp);
@@ -396,7 +396,7 @@
       toggle(solveButton, bg.style.backgroundImage)
     }, 1);
 
-    const text=fg.style.backgroundImage;
+    var text=fg.style.backgroundImage;
     if(! text){
       altsDiv.innerHTML = '';
       return;
@@ -411,23 +411,23 @@
 
     overrides = {}
 
-    const sequence = await predictUri(text, bg.style.backgroundImage, force ? bg.style.backgroundPositionX : null);
+    var sequence = await predictUri(text, bg.style.backgroundImage, force ? bg.style.backgroundPositionX : null);
     resp.placeholder = storedPalceholder;
 
     resp.value = sequence;
   }
 
-  const observer = new MutationObserver(function(mutationsList, observer) {
-      solve(false);
+  var observer = new MutationObserver(async function(mutationsList, observer) {
+    solve(false);
   });
 
 
-  window.addEventListener("load", function() { // uBlock Origin on chrome seems to prevent the DOMContentLoaded event from firing...
-    observer.observe(document.body, { attributes: true, childList: true, subtree: true });
 
-    if(navigator.userAgent.toLowerCase().indexOf('firefox') !== -1){ // request canvas permission on firefox
-      let image = new Image(16, 16);
-      imageFromCanvas(image, image, 0);
-    }
-  });
+  observer.observe(document.body, { attributes: true, childList: true, subtree: true });
+
+  if(navigator.userAgent.toLowerCase().indexOf('firefox') !== -1){ // request canvas permission on firefox
+    let image = new Image(16, 16);
+    imageFromCanvas(image, image, 0);
+    delete(image);
+  }
 })();
