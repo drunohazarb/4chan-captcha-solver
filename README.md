@@ -7,6 +7,11 @@ No error handling in place - if solving fails, you can find the reason in js con
 
 I can't upload it to any userscript js site because of size. Most of the size is model weights.
 
+#### 21.01.2024
+
+- New model trained by [Yukariin](https://github.com/Yukariin).
+- Captcha saving feature by [aaafre5](https://github.com/aaafre5).
+
 #### 11.01.2024
 
 - New model trained by [Yukariin](https://github.com/Yukariin).
