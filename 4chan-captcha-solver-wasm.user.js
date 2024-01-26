@@ -7,7 +7,7 @@
 // @match       https://sys.4channel.org/*
 // @grant GM.getValue
 // @grant GM.setValue
-// @version     1.4.6
+// @version     1.4.7
 // @author      brunohazard
 // @require     https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.js
 // @require     https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.10.0/dist/tf-backend-wasm.js
@@ -65,13 +65,6 @@
         }
         if (a) {
           /* transparent pixel to its right */
-          /*
-                  // set to color blue (for debugging)
-                  data[i + 4] = 255;
-                  data[i + 3] = 255;
-                  data[i + 2] = 0;
-                  data[i + 1] = 0;
-                  */
           const pos = (i + 1) / 4;
           const x = pos % width;
           const y = (pos - x) / width;
@@ -81,13 +74,6 @@
           cr += 1;
         } else {
           /* opaque pixel to its right */
-          /*
-                  // set to color red (for debugging)
-                  data[i] = 255;
-                  data[i - 1] = 0;
-                  data[i - 2] = 0;
-                  data[i - 3] = 255;
-                  */
           const pos = (i - 3) / 4;
           const x = pos % width;
           const y = (pos - x) / width;
@@ -108,7 +94,7 @@
    * chkArray, the position with the most matches wins
    * Return in slider-percentage.
    */
-  function getBestPos(bgdata, chkArray, slideWidth) {
+   function getBestPos(bgdata, chkArray, slideWidth) {
     const data = bgdata.data;
     const width = bgdata.width;
     let bestSimilarity = 0;
@@ -155,6 +141,70 @@
     });
   }
 
+  function checkOpaquePixels(igd) {
+      const height = igd.height;
+      const width = igd.width;
+      const data = igd.data;
+
+      for (let y = 0; y < height; y++) {
+          let firstPixelAlpha = data[(y * width + 0) * 4 + 3];
+          let middlePixelAlpha = data[(y * width + Math.floor(width / 2)) * 4 + 3];
+          let lastPixelAlpha = data[(y * width + (width - 1)) * 4 + 3];
+
+          // Check if at least two columns have transparent pixels at this row
+          if ((firstPixelAlpha < 128 && middlePixelAlpha < 128) ||
+              (middlePixelAlpha < 128 && lastPixelAlpha < 128) ||
+              (firstPixelAlpha < 128 && lastPixelAlpha < 128)) {
+
+              // Ensure the matching position isn't equal to image height
+              if(y != 0 && y != height){
+                  console.log(y - 1);
+                  return y - 1;
+              }
+          }
+      }
+
+       // If no match found or y equals to image height, return null
+       return null;
+  }
+
+  function nuBestPos(igd, sigd, row, slideWidth) {
+      const fgwidth = igd.width;
+      const fgdata = igd.data;
+      const bgwidth = sigd.width;
+      const bgdata = sigd.data;
+      let bestSimilarity = 0;
+      let bestPos = 0;
+
+      for (let s = 0; s <= (slideWidth*4); s += 4) {
+          let similarity = 0;
+          let opposition = row+2;
+
+          for(let p=0; p<fgwidth*4; p+=4){
+              //skip alpha pixels
+              if (fgdata[(row)*fgwidth*4 + p+3] < 128) continue;
+              // get RGB values from both images at this point
+              let r1=fgdata[(row * fgwidth + p) * 4],
+                  g1=fgdata[(row * fgwidth + p) * 4+1],
+                  b1=fgdata[(row * fgwidth + p) * 4+2],
+                  r2=bgdata[(opposition * bgwidth + p + s) * 4],
+                  g2=bgdata[(opposition * bgwidth + p + s) * 4+1],
+                  b2=bgdata[(opposition * bgwidth + p + s) * 4+2];
+
+              // use pxlBlackOrWhite to convert these to black or white and then compare
+              if(pxlBlackOrWhite(r1,g1,b1) === pxlBlackOrWhite(r2,g2,b2))
+                  similarity++;
+          }
+
+
+          if (similarity > bestSimilarity) {
+              bestSimilarity = similarity;
+              bestPos = s;
+          }
+     }
+     return bestPos / slideWidth * 100;
+  }
+
   /*
    * Automatically slide captcha into place
    * Arguments are the "t-fg', 't-bg', 't-slider' elements of the captcha
@@ -166,18 +216,32 @@
 
     // load foreground (image with holes)
     const igd = await getImageDataFromURI(tfgUri);
-    // get array with pixels of foreground
-    // that we compare to background
-    const chkArray = getBoundries(igd);
     // load background (image that gets slid)
     const sigd = await getImageDataFromURI(tbgUri);
     const slideWidth = sigd.width - igd.width;
-    // slide, compare and get best matching position
-    const sliderPos = getBestPos(sigd, chkArray, slideWidth);
-    // slide in the UI
-    sliderElement.value = sliderPos;
-    sliderElement.dispatchEvent(new Event('input'), { bubbles: true });
-    return 0 - (sliderPos / 2);
+    const opqCol = checkOpaquePixels(igd);
+
+    if (opqCol === null)
+    {
+        console.log("old");
+        // get array with pixels of foreground
+        // that we compare to background
+        const chkArray = getBoundries(igd);
+        // slide, compare and get best matching position
+        const sliderPos = getBestPos(sigd, chkArray, slideWidth);
+        // slide in the UI
+        sliderElement.value = sliderPos;
+        sliderElement.dispatchEvent(new Event('input'), { bubbles: true });
+        return 0 - (sliderPos / 2);
+    }
+    else {
+        console.log("new");
+        const sliderPos = nuBestPos(igd, sigd, opqCol, slideWidth);
+        // slide in the UI
+        sliderElement.value = sliderPos;
+        sliderElement.dispatchEvent(new Event('input'), { bubbles: true });
+        return 0 - (sliderPos / 2);
+    }
   }
 
   function toggle(obj,v){
