@@ -1,4 +1,4 @@
- // ==UserScript==
+// ==UserScript==
 // @name        4chan captcha solver
 // @namespace   sneed
 // @match       https://boards.4channel.org/*
