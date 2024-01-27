@@ -7,7 +7,7 @@
 // @match       https://sys.4channel.org/*
 // @grant GM.getValue
 // @grant GM.setValue
-// @version     1.4.7
+// @version     1.4.8
 // @author      brunohazard
 // @require     https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.js
 // @description 7/8/2021, 1:16:32 PM
@@ -145,24 +145,23 @@
       const data = igd.data;
 
       for (let y = 0; y < height; y++) {
-          let firstPixelAlpha = data[(y * width + 0) * 4 + 3];
-          let middlePixelAlpha = data[(y * width + Math.floor(width / 2)) * 4 + 3];
-          let lastPixelAlpha = data[(y * width + (width - 1)) * 4 + 3];
+          const pixels = [data[(y * width + 0) * 4 + 3],
+                          data[(y * width + Math.floor(width / 100 * 25)) * 4 + 3], // 25%
+                          data[(y * width + Math.floor(width / 100 * 50)) * 4 + 3], // 50%
+                          data[(y * width + Math.floor(width / 100 * 75)) * 4 + 3], // 75%
+                          data[(y * width + (width - 1)) * 4 + 3]];
 
-          // Check if at least two columns have transparent pixels at this row
-          if ((firstPixelAlpha < 128 && middlePixelAlpha < 128) ||
-              (middlePixelAlpha < 128 && lastPixelAlpha < 128) ||
-              (firstPixelAlpha < 128 && lastPixelAlpha < 128)) {
-
-              // Ensure the matching position isn't equal to image height
-              if(y != 0 && y != height){
-                  console.log(y - 1);
-                  return y - 1;
-              }
+          let alphaPixels = 0;
+          for (let px = 0; px < pixels.length; px++)
+          {
+                if (pixels[px] < 128) alphaPixels++;
+                if (alphaPixels >= pixels.length - 1
+                    && y != 0
+                    && y != height)
+                    return y - 1;
           }
       }
 
-       // If no match found or y equals to image height, return null
        return null;
   }
 
@@ -173,21 +172,41 @@
       const bgdata = sigd.data;
       let bestSimilarity = 0;
       let bestPos = 0;
+      let worstSimilarity = bgwidth;
+      let opposition = row+1;
 
-      for (let s = 0; s <= (slideWidth*4); s += 4) {
+      for (let r=opposition; r < row + 11; r++) {
           let similarity = 0;
-          let opposition = row+2;
+          for(let p=0; p < bgwidth; p++){
+              const r1=bgdata[(r * bgwidth + p) * 4],
+                    g1=bgdata[(r * bgwidth + p) * 4+1],
+                    b1=bgdata[(r * bgwidth + p) * 4+2],
+                    r2=bgdata[((r+1) * bgwidth + p) * 4],
+                    g2=bgdata[((r+1) * bgwidth + p) * 4+1],
+                    b2=bgdata[((r+1) * bgwidth + p) * 4+2];
 
-          for(let p=0; p<fgwidth*4; p+=4){
-              //skip alpha pixels
-              if (fgdata[(row)*fgwidth*4 + p+3] < 128) continue;
+              if(pxlBlackOrWhite(r1,g1,b1) === pxlBlackOrWhite(r2,g2,b2))
+                  similarity++;
+          }
+          if (similarity < worstSimilarity) {
+              worstSimilarity = similarity;
+              opposition = r+1;
+          }
+      }
+
+      for (let s = 0; s <= slideWidth*4; s += 4) {
+          let similarity = 0;
+
+          for(let p=0; p < fgwidth; p++){
+              // skip alpha pixels
+              if (fgdata[(row * fgwidth + p) * 4+3] < 128) continue;
               // get RGB values from both images at this point
-              let r1=fgdata[(row * fgwidth + p) * 4],
-                  g1=fgdata[(row * fgwidth + p) * 4+1],
-                  b1=fgdata[(row * fgwidth + p) * 4+2],
-                  r2=bgdata[(opposition * bgwidth + p + s) * 4],
-                  g2=bgdata[(opposition * bgwidth + p + s) * 4+1],
-                  b2=bgdata[(opposition * bgwidth + p + s) * 4+2];
+              const r1=fgdata[(row * fgwidth + p) * 4],
+                    g1=fgdata[(row * fgwidth + p) * 4+1],
+                    b1=fgdata[(row * fgwidth + p) * 4+2],
+                    r2=bgdata[(opposition * bgwidth + p + s) * 4],
+                    g2=bgdata[(opposition * bgwidth + p + s) * 4+1],
+                    b2=bgdata[(opposition * bgwidth + p + s) * 4+2];
 
               // use pxlBlackOrWhite to convert these to black or white and then compare
               if(pxlBlackOrWhite(r1,g1,b1) === pxlBlackOrWhite(r2,g2,b2))
@@ -205,7 +224,7 @@
 
   /*
    * Automatically slide captcha into place
-   * Arguments are the "t-fg', 't-bg', 't-slider' elements of the captcha
+   * Arguments are the 't-fg', 't-bg', 't-slider' elements of the captcha
    */
   async function slideCaptcha(tfgElement, tbgElement, sliderElement) {
     // get data uris for captcha back- and foreground
@@ -218,6 +237,7 @@
     const sigd = await getImageDataFromURI(tbgUri);
     const slideWidth = sigd.width - igd.width;
     const opqCol = checkOpaquePixels(igd);
+    let sliderPos;
 
     if (opqCol === null)
     {
@@ -226,20 +246,16 @@
         // that we compare to background
         const chkArray = getBoundries(igd);
         // slide, compare and get best matching position
-        const sliderPos = getBestPos(sigd, chkArray, slideWidth);
-        // slide in the UI
-        sliderElement.value = sliderPos;
-        sliderElement.dispatchEvent(new Event('input'), { bubbles: true });
-        return 0 - (sliderPos / 2);
+        sliderPos = getBestPos(sigd, chkArray, slideWidth);
     }
     else {
         console.log("new");
-        const sliderPos = nuBestPos(igd, sigd, opqCol, slideWidth);
-        // slide in the UI
-        sliderElement.value = sliderPos;
-        sliderElement.dispatchEvent(new Event('input'), { bubbles: true });
-        return 0 - (sliderPos / 2);
+        sliderPos = nuBestPos(igd, sigd, opqCol, slideWidth);
     }
+    // slide in the UI
+    sliderElement.value = sliderPos;
+    sliderElement.dispatchEvent(new Event('input'), { bubbles: true });
+    return 0 - (sliderPos / 2);
   }
 
   function toggle(obj,v){
