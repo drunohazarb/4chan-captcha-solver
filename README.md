@@ -9,6 +9,10 @@ I can't upload it to any userscript js site because of size. Most of the size is
 
 ### IF YOU'RE ON FIREFOX/LIBREWOLF AND YOU HAVE `privacy.resistFingerprinting` ENABLED IN `about:config` YOU NEED TO GRANT CANVAS PERMISSION TO 4CHAN.ORG OR THE SCRIPT WILL NOT WORK
 
+#### 28.01.2024
+
+- New model
+
 #### 25.01.2024
 
 - Now handles the new slider puzzle used in red boards.
