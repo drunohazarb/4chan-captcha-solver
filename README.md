@@ -11,7 +11,7 @@ I can't upload it to any userscript js site because of size. Most of the size is
 
 #### 28.01.2024
 
-- New model
+- New model - sligthly larger but more precise
 
 #### 25.01.2024
 
