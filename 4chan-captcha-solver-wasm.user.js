@@ -7,7 +7,7 @@
 // @match       https://sys.4channel.org/*
 // @grant GM.getValue
 // @grant GM.setValue
-// @version     1.4.11
+// @version     1.4.12
 // @author      brunohazard
 // @require     https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.js
 // @require     https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.10.0/dist/tf-backend-wasm.js
@@ -42,45 +42,44 @@
   }
 
   /*
-   * Get bordering pixels of transparent areas (the outline of the circles)
-   * and return their coordinates with the neighboring color.
-   */
+  * Get bordering pixels of transparent areas (the outline of the holes)
+  * and return their coordinates with the neighboring color.
+  */
   function getBoundries(imgdata) {
     const data = imgdata.data;
     const width = imgdata.width;
-
     let i = data.length - 1;
-    let cl = 0;
-    let cr = 0;
     const chkArray = [];
     let opq = true;
+
     while (i > 0) {
-      // alpha channel above 128 is assumed opaque
-      const a = data[i] > 128;
+      const a = data[i] > 128; // Alpha channel, > 128 means opaque
       if (a !== opq) {
         if ((data[i - 4] > 128) === opq) {
-          // ignore just 1-width areas
+          // Ignore 1-width areas
           i -= 4;
           continue;
         }
         if (a) {
-          /* transparent pixel to its right */
+          // Transparent pixel to its right
           const pos = (i + 1) / 4;
           const x = pos % width;
           const y = (pos - x) / width;
-          // 1: black, 0: white
-          const clr = pxlBlackOrWhite(data[i - 1], data[i - 2], data[i - 3]);
-          chkArray.push([x, y, clr]);
-          cr += 1;
+          if (!isCheckerboardPixel(x, y)) {
+            // 1: black, 0: white
+            const clr = pxlBlackOrWhite(data[i - 1], data[i - 2], data[i - 3]);
+            chkArray.push([x, y, clr]);
+          }
         } else {
-          /* opaque pixel to its right */
+          // Opaque pixel to its right
           const pos = (i - 3) / 4;
           const x = pos % width;
           const y = (pos - x) / width;
-          // 1: black, 0: white
-          const clr = pxlBlackOrWhite(data[i + 1], data[i + 2], data[i + 3]);
-          chkArray.push([x, y, clr]);
-          cl += 1;
+          if (!isCheckerboardPixel(x, y)) {
+            // 1: black, 0: white
+            const clr = pxlBlackOrWhite(data[i + 1], data[i + 2], data[i + 3]);
+            chkArray.push([x, y, clr]);
+          }
         }
         opq = a;
       }
@@ -90,11 +89,19 @@
   }
 
   /*
-   * slide the background image and compare the colors of the border pixels in
-   * chkArray, the position with the most matches wins
-   * Return in slider-percentage.
-   */
-   function getBestPos(bgdata, chkArray, slideWidth) {
+  * Determine if a pixel is part of the checkerboard pattern
+  * We assume the checkerboard is a grid with alternating 1px lines.
+  */
+  function isCheckerboardPixel(x, y) {
+    return x % 2 === 0 || y % 2 === 0;
+  }
+
+  /*
+  * Slide the background image and compare the colors of the border pixels in
+  * chkArray, skipping checkerboard pixels.
+  * The position with the most matches wins.
+  */
+  function getBestPos(bgdata, chkArray, slideWidth) {
     const data = bgdata.data;
     const width = bgdata.width;
     let bestSimilarity = 0;
@@ -108,6 +115,9 @@
         const x = chk[0] + s;
         const y = chk[1];
         const clr = chk[2];
+        if (isCheckerboardPixel(x, y)) {
+          continue; // Skip checkerboard pixels
+        }
         const off = (y * width + x) * 4;
         const bgclr = pxlBlackOrWhite(data[off], data[off + 1], data[off + 2]);
         if (bgclr === clr) {
@@ -121,7 +131,7 @@
     }
     return bestPos / slideWidth * 100;
   }
-
+  
   function getImageDataFromURI(uri) {
     return new Promise((resolve, reject) => {
       const image = document.createElement('img');
@@ -141,120 +151,25 @@
     });
   }
 
-  function checkOpaquePixels(igd) {
-      const height = igd.height;
-      const width = igd.width;
-      const data = igd.data;
-
-      for (let y = 0; y < height; y++) {
-          const pixels = [data[(y * width + 0) * 4 + 3],
-                          data[(y * width + Math.floor(width / 100 * 25)) * 4 + 3], // 25%
-                          data[(y * width + Math.floor(width / 100 * 50)) * 4 + 3], // 50%
-                          data[(y * width + Math.floor(width / 100 * 75)) * 4 + 3], // 75%
-                          data[(y * width + (width - 1)) * 4 + 3]];
-
-          let alphaPixels = 0;
-          for (let px = 0; px < pixels.length; px++)
-          {
-                if (pixels[px] < 128) alphaPixels++;
-                if (alphaPixels >= pixels.length - 1
-                    && y != 0
-                    && y != height)
-                    return y - 1;
-          }
-      }
-
-       return null;
-  }
-
-  function nuBestPos(igd, sigd, row, slideWidth) {
-      const fgwidth = igd.width;
-      const fgdata = igd.data;
-      const bgwidth = sigd.width;
-      const bgdata = sigd.data;
-      let bestSimilarity = 0;
-      let bestPos = 0;
-      let worstSimilarity = bgwidth;
-      let opposition = row+1;
-
-      for (let r=opposition; r < row + 11; r++) {
-          let similarity = 0;
-          for(let p=0; p < bgwidth; p++){
-              const r1=bgdata[(r * bgwidth + p) * 4],
-                    g1=bgdata[(r * bgwidth + p) * 4+1],
-                    b1=bgdata[(r * bgwidth + p) * 4+2],
-                    r2=bgdata[((r+1) * bgwidth + p) * 4],
-                    g2=bgdata[((r+1) * bgwidth + p) * 4+1],
-                    b2=bgdata[((r+1) * bgwidth + p) * 4+2];
-
-              if(pxlBlackOrWhite(r1,g1,b1) === pxlBlackOrWhite(r2,g2,b2))
-                  similarity++;
-          }
-          if (similarity < worstSimilarity) {
-              worstSimilarity = similarity;
-              opposition = r+1;
-          }
-      }
-
-      for (let s = 0; s <= slideWidth*4; s += 4) {
-          let similarity = 0;
-
-          for(let p=0; p < fgwidth; p++){
-              // skip alpha pixels
-              if (fgdata[(row * fgwidth + p) * 4+3] < 128) continue;
-              // get RGB values from both images at this point
-              const r1=fgdata[(row * fgwidth + p) * 4],
-                    g1=fgdata[(row * fgwidth + p) * 4+1],
-                    b1=fgdata[(row * fgwidth + p) * 4+2],
-                    r2=bgdata[(opposition * bgwidth + p + s) * 4],
-                    g2=bgdata[(opposition * bgwidth + p + s) * 4+1],
-                    b2=bgdata[(opposition * bgwidth + p + s) * 4+2];
-
-              // use pxlBlackOrWhite to convert these to black or white and then compare
-              if(pxlBlackOrWhite(r1,g1,b1) === pxlBlackOrWhite(r2,g2,b2))
-                  similarity++;
-          }
-
-
-          if (similarity > bestSimilarity) {
-              bestSimilarity = similarity;
-              bestPos = s;
-          }
-     }
-     return bestPos / slideWidth * 100;
-  }
-
   /*
    * Automatically slide captcha into place
    * Arguments are the 't-fg', 't-bg', 't-slider' elements of the captcha
    */
   async function slideCaptcha(tfgElement, tbgElement, sliderElement) {
-    // get data uris for captcha back- and foreground
     const tbgUri = tbgElement.style.backgroundImage.slice(5, -2);
     const tfgUri = tfgElement.style.backgroundImage.slice(5, -2);
 
-    // load foreground (image with holes)
     const igd = await getImageDataFromURI(tfgUri);
-    // load background (image that gets slid)
     const sigd = await getImageDataFromURI(tbgUri);
     const slideWidth = sigd.width - igd.width;
-    const opqCol = checkOpaquePixels(igd);
-    let sliderPos;
 
-    if (opqCol === null)
-    {
-        console.log("old");
-        // get array with pixels of foreground
-        // that we compare to background
-        const chkArray = getBoundries(igd);
-        // slide, compare and get best matching position
-        sliderPos = getBestPos(sigd, chkArray, slideWidth);
-    }
-    else {
-        console.log("new");
-        sliderPos = nuBestPos(igd, sigd, opqCol, slideWidth);
-    }
-    // slide in the UI
+    // Get the border pixels, skipping checkerboard lines
+    const chkArray = getBoundries(igd);
+
+    // Slide, compare, and get the best matching position
+    const sliderPos = getBestPos(sigd, chkArray, slideWidth);
+
+    // Update the slider UI
     sliderElement.value = sliderPos;
     sliderElement.dispatchEvent(new Event('input'), { bubbles: true });
     return 0 - (sliderPos / 2);
