@@ -7,7 +7,7 @@
 // @match       https://sys.4channel.org/*
 // @grant GM.getValue
 // @grant GM.setValue
-// @version     1.4.13
+// @version     1.4.14
 // @author      brunohazard
 // @require     https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.js
 // @require     https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.10.0/dist/tf-backend-wasm.js
