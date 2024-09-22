@@ -90,10 +90,67 @@
 
   /*
   * Determine if a pixel is part of the checkerboard pattern
-  * We assume the checkerboard is a grid with alternating 1px lines.
   */
   function isCheckerboardPixel(x, y) {
     return x % 2 === 0 || y % 2 === 0;
+  }
+
+  /*
+  * Determine if a pixel is part of a black line by checking if it's black enough.
+  */
+  function isBlack(r, g, b) {
+    return (r + g + b < 30);  // A low sum means the pixel is close to black
+  }
+
+  /*
+  * Check neighboring pixels to detect black clusters.
+  */
+  function isClusterBlack(bgdata, x, y, width, height, clusterSize = 1) {
+    const data = bgdata.data;
+    
+    for (let i = -clusterSize; i <= clusterSize; i++) {
+      for (let j = -clusterSize; j <= clusterSize; j++) {
+        const nx = x + i;
+        const ny = y + j;
+
+        // Ensure we stay within bounds
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+
+        const off = (ny * width + nx) * 4;
+        const r = data[off], g = data[off + 1], b = data[off + 2];
+
+        if (isBlack(r, g, b)) return true;
+      }
+    }
+    return false;
+  }
+
+  /*
+  * Detect grid lines dynamically based on black pixel clusters.
+  * This function returns a set of pixel coordinates (as keys) representing the grid areas to ignore.
+  */
+  function detectGridLines(bgdata) {
+    const width = bgdata.width;
+    const height = bgdata.height;
+    const data = bgdata.data;
+
+    const gridClusters = new Set();
+
+    // Loop through each pixel, and detect black clusters
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const off = (y * width + x) * 4;
+        const r = data[off], g = data[off + 1], b = data[off + 2];
+
+        if (isBlack(r, g, b)) {
+          if (isClusterBlack(bgdata, x, y, width, height)) {
+            gridClusters.add(`${x},${y}`);
+          }
+        }
+      }
+    }
+
+    return gridClusters;
   }
 
   /*
@@ -104,6 +161,8 @@
   function getBestPos(bgdata, chkArray, slideWidth) {
     const data = bgdata.data;
     const width = bgdata.width;
+    const gridClusters = detectGridLines(bgdata);
+
     let bestSimilarity = 0;
     let bestPos = 0;
 
@@ -115,11 +174,21 @@
         const x = chk[0] + s;
         const y = chk[1];
         const clr = chk[2];
+
         if (isCheckerboardPixel(x, y)) {
           continue; // Skip checkerboard pixels
         }
+
+        // Skip grid clusters detected dynamically
+        if (gridClusters.has(`${x},${y}`)) {
+          continue;
+        }
+
         const off = (y * width + x) * 4;
-        const bgclr = pxlBlackOrWhite(data[off], data[off + 1], data[off + 2]);
+        const r = data[off], g = data[off + 1], b = data[off + 2];
+
+        // Compare pixel colors
+        const bgclr = pxlBlackOrWhite(r, g, b);
         if (bgclr === clr) {
           similarity += 1;
         }

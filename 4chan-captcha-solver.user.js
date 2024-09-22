@@ -10,6 +10,7 @@
 // @version     1.4.12
 // @author      brunohazard
 // @require     https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.js
+// @require     https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.10.0/dist/tf-backend-wasm.js
 // @description 7/8/2021, 1:16:32 PM
 // @run-at      document-end
 // ==/UserScript==
@@ -28,7 +29,8 @@
   const charset = [' ', '0', '2', '4', '8', 'A', 'D', 'G', 'H', 'J', 'K', 'M', 'N', 'P', 'R', 'S', 'T', 'V', 'W', 'X', 'Y'];
   let model;
 
-  tf.setBackend('cpu');
+  tf.wasm.setWasmPaths('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-wasm@4.10.0/dist/');
+  tf.setBackend('wasm');
   tf.enableProdMode();
 
   /*
@@ -95,6 +97,65 @@
   }
 
   /*
+  * Determine if a pixel is part of a black line by checking if it's black enough.
+  */
+  function isBlack(r, g, b) {
+    return (r + g + b < 30);  // A low sum means the pixel is close to black
+  }
+
+  /*
+  * Check neighboring pixels to detect black clusters.
+  * This function will help detect slightly distorted or diagonal lines by looking at neighboring pixels.
+  */
+  function isClusterBlack(bgdata, x, y, width, height, clusterSize = 1) {
+    const data = bgdata.data;
+    
+    for (let i = -clusterSize; i <= clusterSize; i++) {
+      for (let j = -clusterSize; j <= clusterSize; j++) {
+        const nx = x + i;
+        const ny = y + j;
+
+        // Ensure we stay within bounds
+        if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+
+        const off = (ny * width + nx) * 4;
+        const r = data[off], g = data[off + 1], b = data[off + 2];
+
+        if (isBlack(r, g, b)) return true;
+      }
+    }
+    return false;
+  }
+
+  /*
+  * Detect distorted grid lines dynamically based on black pixel clusters.
+  * This function returns a set of pixel coordinates (as keys) representing the grid areas to ignore.
+  */
+  function detectGridLines(bgdata) {
+    const width = bgdata.width;
+    const height = bgdata.height;
+    const data = bgdata.data;
+
+    const gridClusters = new Set();
+
+    // Loop through each pixel, and detect black clusters
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const off = (y * width + x) * 4;
+        const r = data[off], g = data[off + 1], b = data[off + 2];
+
+        if (isBlack(r, g, b)) {
+          if (isClusterBlack(bgdata, x, y, width, height)) {
+            gridClusters.add(`${x},${y}`);
+          }
+        }
+      }
+    }
+
+    return gridClusters;
+  }
+
+  /*
   * Slide the background image and compare the colors of the border pixels in
   * chkArray, skipping checkerboard pixels.
   * The position with the most matches wins.
@@ -102,6 +163,8 @@
   function getBestPos(bgdata, chkArray, slideWidth) {
     const data = bgdata.data;
     const width = bgdata.width;
+    const gridClusters = detectGridLines(bgdata);
+
     let bestSimilarity = 0;
     let bestPos = 0;
 
@@ -113,11 +176,21 @@
         const x = chk[0] + s;
         const y = chk[1];
         const clr = chk[2];
+
         if (isCheckerboardPixel(x, y)) {
           continue; // Skip checkerboard pixels
         }
+
+        // Skip grid clusters detected dynamically
+        if (gridClusters.has(`${x},${y}`)) {
+          continue;
+        }
+
         const off = (y * width + x) * 4;
-        const bgclr = pxlBlackOrWhite(data[off], data[off + 1], data[off + 2]);
+        const r = data[off], g = data[off + 1], b = data[off + 2];
+
+        // Compare pixel colors
+        const bgclr = pxlBlackOrWhite(r, g, b);
         if (bgclr === clr) {
           similarity += 1;
         }
