@@ -526,7 +526,7 @@
     resp.after(solveButton);
 
     if (g_saveCaptcha) {
-      const qrSubmit = captchaRoot.parentElement.querySelector('#qrForm input[type=submit]');
+      const qrSubmit = captchaRoot.parentElement.parentElement.querySelector('input[type=submit]');
 
       // save captcha here because quick reply form dies before post success event gets called
       if (qrSubmit) {
